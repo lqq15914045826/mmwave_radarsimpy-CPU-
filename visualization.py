@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import os
 from datetime import datetime
 
+from radarsimpy.processing import range_fft
+
 
 def visualize_mmwave_dataset(dataset_dir, output_dir):
     """
@@ -61,17 +63,28 @@ def visualize_mmwave_dataset(dataset_dir, output_dir):
                 # Use Channel 0 for visualization
                 adc_data = data[0]
 
+                window_r = np.hamming(adc_data.shape[1])  # Range window
                 # --- Signal Processing ---
+                # Center the data by removing the mean across samples (DC offset removal)
+                adc_data = adc_data - np.mean(adc_data, axis=1, keepdims=True)
+
                 # 1. Range FFT (across samples)
-                range_fft = np.fft.fft(adc_data, axis=1)
+                range_fft = np.fft.fft(adc_data * window_r, axis=1)
+
+                roi_range = 100
+                range_fft_roi = range_fft[:, :roi_range]
 
                 # 2. Doppler FFT (across chirps)
                 # Shift zero-frequency component to the center of the spectrum
-                rd_map = np.fft.fftshift(np.fft.fft(range_fft, axis=0), axes=0)
-                rd_db = 20 * np.log10(np.abs(rd_map) + 1e-6)  # Convert to dB
+                window_d = np.hamming(adc_data.shape[0])  # Doppler window
+                rd_map = np.fft.fftshift(
+                    np.fft.fft(range_fft_roi * window_d[:, np.newaxis], axis=0).T,
+                    axes=0,
+                )
+                rd_db = 20 * np.log10(np.abs(rd_map) + 1e-12)  # Convert to dB
 
                 # 3. Range Profile (Average across all chirps)
-                avg_range_profile = np.mean(np.abs(range_fft), axis=0)
+                avg_range_profile = np.mean(np.abs(range_fft_roi), axis=0)
 
                 # --- Plotting ---
                 fig, axes = plt.subplots(1, 3, figsize=(20, 6))
@@ -85,15 +98,26 @@ def visualize_mmwave_dataset(dataset_dir, output_dir):
                 plt.colorbar(im0, ax=axes[0])
 
                 # Panel 2: Range Profile (Log Scale)
-                axes[1].plot(avg_range_profile)
+                axes[1].plot(np.arange(roi_range), avg_range_profile)
                 axes[1].set_title("Average Range Profile")
                 axes[1].set_xlabel("Range Bin")
                 axes[1].set_ylabel("Amplitude (Linear)")
                 axes[1].set_yscale("log")  # Log scale is better for radar dynamic range
+                axes[1].set_xlim(0, roi_range)
                 axes[1].grid(True, which="both", ls="-", alpha=0.2)
 
                 # Panel 3: Range-Doppler Map (dB Scale)
-                im2 = axes[2].imshow(rd_db, aspect="auto", origin="lower", cmap="jet")
+                v_max = np.max(rd_db)
+                v_min = v_max - 50  # Show a 50 dB dynamic range
+
+                im2 = axes[2].imshow(
+                    rd_db,
+                    aspect="auto",
+                    origin="lower",
+                    cmap="jet",
+                    vmin=v_min,
+                    vmax=v_max,
+                )
                 axes[2].set_title("Range-Doppler Map (dB)")
                 axes[2].set_xlabel("Range Bin")
                 axes[2].set_ylabel("Doppler Bin (Centered)")
