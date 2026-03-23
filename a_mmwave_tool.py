@@ -80,11 +80,11 @@ def create_targets(num_targets=2, frame_idx=0, gesture_type="push"):
         else:
             micro_oscillation = 0.05 * np.sin(2 * np.pi * 8 * t)
             loc = [
-                center_x + 0.08,  # 距离比手掌远 8cm
+                center_x + 0.08, 
                 center_y + 0.1,
                 0.15 + micro_oscillation,
             ]
-            vel = [v * 1.25 for v in v_main]  # 速度稍微快一点，增加多普勒扩展
+            vel = [v * 1.25 for v in v_main]  
             rcs = 0.6
 
         """

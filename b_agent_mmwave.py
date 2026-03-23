@@ -31,7 +31,7 @@ class RadarAgent:
         return 2
 
     def parse_gesture(self, text):
-        # 识别手势类型
+        
         if "push" in text:
             return "push"
         if "pull" in text:
